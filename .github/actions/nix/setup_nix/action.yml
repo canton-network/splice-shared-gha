@@ -178,10 +178,11 @@ runs:
         if [ ! -f "/cache/nix/$cache_key/cached" ]; then
 
           echo "Pruning cache keys older than 30 days"
-          find /cache/nix -mindepth 1 -maxdepth 1 -type d -mtime +30 -print -exec rm -rf {} \;
+          find /cache/nix -mindepth 1 -maxdepth 1 -type d -mtime +30 -print -exec sudo rm -rf {} \;
 
           echo "Pruning binary cache entries older than 30 days"
-          find /cache/nix/binary_cache -mindepth 1 -maxdepth 1 -type d -mtime +30 -print -exec rm -rf {} \;
+          find /cache/nix/binary_cache/nar -mindepth 1 -maxdepth 1 -mtime +30 -print -exec sudo rm -rf {} \;
+          find /cache/nix/binary_cache -mindepth 1 -maxdepth 1 -mtime +30 -print -exec sudo rm -rf {} \;
 
           echo "Saving nix"
 
