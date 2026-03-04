@@ -176,6 +176,14 @@ runs:
         chown -R $(whoami):$(whoami) ~
         cat /tmp/nix-cache-key
         if [ ! -f "/cache/nix/$cache_key/cached" ]; then
+
+          echo "Pruning cache keys older than 30 days"
+          find /cache/nix -mindepth 1 -maxdepth 1 -type d -mtime +30 -print -exec sudo rm -rf {} \;
+
+          echo "Pruning binary cache entries older than 30 days"
+          find /cache/nix/binary_cache/nar -mindepth 1 -maxdepth 1 -mtime +30 -print -exec sudo rm -rf {} \;
+          find /cache/nix/binary_cache -mindepth 1 -maxdepth 1 -mtime +30 -print -exec sudo rm -rf {} \;
+
           echo "Saving nix"
 
           sudo -v ; curl https://rclone.org/install.sh | sudo bash
@@ -185,7 +193,7 @@ runs:
           . ~/.nix-profile/etc/profile.d/nix.sh
 
           echo "Garbage collecting to reduce cache size"
-          nix-store --gc
+          nix-collect-garbage --delete-older-than 30d
 
           nix copy --all --to 'file:///cache/nix/binary_cache?trusted=1' -v
 
