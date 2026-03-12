@@ -4,7 +4,8 @@ inputs:
   max_age_days:
     description: "Delete cache entries older than this many days"
     required: false
-    default: "30"
+    # FIXME increase again; this just for testing
+    default: "20"
 
 runs:
   using: "composite"
@@ -34,3 +35,11 @@ runs:
         fi
 
         echo "Nix cache cleanup complete"
+    - name: Report Failures on Slack & Github
+      if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
+      uses: ./splice-shared-gha/.github/actions/tests/failure_notifications
+      with:
+        workload_identity_provider: '${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}'
+        service_account: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}'
+        notifications_url: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}'
+        slack_channel: '${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}'
