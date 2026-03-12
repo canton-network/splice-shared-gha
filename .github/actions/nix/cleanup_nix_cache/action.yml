@@ -4,8 +4,7 @@ inputs:
   max_age_days:
     description: "Delete cache entries older than this many days"
     required: false
-    # FIXME increase again; this just for testing
-    default: "20"
+    default: "30"
 
 runs:
   using: "composite"
