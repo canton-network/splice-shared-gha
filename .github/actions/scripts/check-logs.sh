@@ -11,7 +11,14 @@
 
 
 
-set -eou pipefail
+set -eoux pipefail
+
+cleanup() {
+  echo "Script failed"
+  df -h
+}
+
+trap cleanup EXIT
 
 LOGFILE="$1"
 shift

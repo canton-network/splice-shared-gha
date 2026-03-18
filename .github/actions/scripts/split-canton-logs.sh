@@ -15,6 +15,13 @@ LOGFILE="$1"
 LOGFILE_BEFORE="$2"
 LOGFILE_AFTER="$3"
 
+cleanup() {
+  echo "Script failed"
+  df -h
+}
+
+trap cleanup EXIT
+
 # We're using this rather specific pattern to avoid skipping over logs.
 SHUTDOWN_MESSAGE_PATTERN='"message":"Shutting down\.\.\.","logger_name":"c\.d\..*\.Canton.*App$"'
 
