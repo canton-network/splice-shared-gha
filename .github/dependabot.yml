@@ -34,7 +34,8 @@ updates:
     assignees:
       - "krzysztofczyz-da"
   - package-ecosystem: "github-actions"
-    directory: "/.github/actions/**/*.{yaml,yml}"
+    directories:
+      - "/.github/actions/**/*.{yaml,yml}"
     # Check for updates to GitHub Actions every week
     schedule:
       interval: "daily"
