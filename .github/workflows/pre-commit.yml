@@ -16,7 +16,5 @@ jobs:
     - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
     # For pin-github-action
     - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
-    - run: npm install -g pin-github-action
-      shell: bash
     # Run all hooks
     - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
