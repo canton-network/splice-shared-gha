@@ -24,6 +24,7 @@ repos:
         name: Pin GitHub Actions versions
         description: Pin GHA action versions
         language: system
-        entry: pin-github-action
+        entry: npx
+        args: ['pin-github-action']
         files: '^.github/workflows/'
         types: [yaml]
