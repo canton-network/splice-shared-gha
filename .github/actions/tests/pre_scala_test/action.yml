@@ -7,12 +7,12 @@ inputs:
   test_names_file:
     description: "File containing the test names"
     required: true
-  skip_if_regex:
-    description: "Skip the test if the commit messages on the branch match this regex"
+  skip_if_commit_tag:
+    description: "Skip the test if the last commit message contains this tag"
     required: false
     default: ""
   run_if_commit_tag:
-    description: "Run the job only if the commit message contains this tag"
+    description: "Run the job only if the last commit message contains this tag"
     required: false
     default: ""
   skip_if_files_changed:
