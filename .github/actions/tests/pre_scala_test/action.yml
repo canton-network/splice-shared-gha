@@ -53,9 +53,9 @@ runs:
         last_commit_msg=$(git log -1 --pretty=%B)
         if [[ $last_commit_msg =~ "[${{ inputs.skip_if_commit_tag }}]" ]]; then
           echo "Commit message ($last_commit_msg) includes tag (${{ inputs.skip_if_commit_tag }}), skipping"
+          echo "skip=true" >> "$GITHUB_ENV"
         else
           echo "Commit message ($last_commit_msg) does not include tag (${{ inputs.skip_if_commit_tag }}), running"
-          echo "skip=true" >> "$GITHUB_ENV"
         fi
     - name: Check if include commit message tag matches
       if: ${{ inputs.run_if_commit_tag != '' }}
