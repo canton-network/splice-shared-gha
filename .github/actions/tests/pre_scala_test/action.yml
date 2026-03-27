@@ -7,12 +7,12 @@ inputs:
   test_names_file:
     description: "File containing the test names"
     required: true
-  skip_if_regex:
-    description: "Skip the test if the commit messages on the branch match this regex"
+  skip_if_commit_tag:
+    description: "Skip the test if the last commit message contains this tag"
     required: false
     default: ""
   run_if_commit_tag:
-    description: "Run the job only if the commit message contains this tag"
+    description: "Run the job only if the last commit message contains this tag"
     required: false
     default: ""
   skip_if_files_changed:
@@ -46,19 +46,17 @@ runs:
         echo "Only static tests should be running, skipping this job"
         echo "skip=true" >> "$GITHUB_ENV"
 
-    - name: Check if skip regex matches
-      if: ${{ inputs.skip_if_regex != '' }}
+    - name: Check if include commit message tag matches and skip
+      if: ${{ inputs.skip_if_commit_tag != '' }}
       shell: bash
       run: |
-        base=$(build-tools/get-latest-main-commit)
-        msg=$(git log "$base"..HEAD --pretty=%B)
-        if [[ $msg =~ ${{ inputs.skip_if_regex }} ]]; then
-          echo "Commit message ($msg) matches regex (${{ inputs.skip_if_regex }}), skipping"
+        last_commit_msg=$(git log -1 --pretty=%B)
+        if [[ $last_commit_msg =~ "[${{ inputs.skip_if_commit_tag }}]" ]]; then
+          echo "Commit message ($last_commit_msg) includes tag (${{ inputs.skip_if_commit_tag }}), skipping"
           echo "skip=true" >> "$GITHUB_ENV"
         else
-          echo "Commit message ($msg) does not match regex (${{ inputs.skip_if_regex }}), not skipping"
+          echo "Commit message ($last_commit_msg) does not include tag (${{ inputs.skip_if_commit_tag }}), running"
         fi
-
     - name: Check if include commit message tag matches
       if: ${{ inputs.run_if_commit_tag != '' }}
       shell: bash
