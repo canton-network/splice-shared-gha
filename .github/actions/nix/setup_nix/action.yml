@@ -15,7 +15,7 @@ inputs:
     description: "Choose nix target: oss - restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts), static_tests - for static tests, default - for enterprise dependencies"
     required: true
   cache_version:
-    description: "The cache version"
+    description: "Cache version"
     required: true
   should_save:
     description: "If the nix cache should be saved"

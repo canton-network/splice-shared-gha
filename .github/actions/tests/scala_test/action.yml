@@ -90,6 +90,9 @@ inputs:
     description: "Restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts)"
     required: false
     default: "false"
+  cache_version:
+    description: "Cache version"
+    required: true
 
 runs:
   using: "composite"
@@ -141,7 +144,7 @@ runs:
       id: setup_sbt
       uses: ./splice-shared-gha/.github/actions/sbt/setup_sbt
       with:
-        cache_version: 7
+        cache_version: ${{ inputs.cache_version }}
 
     - name: Set Daml package versions
       uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
@@ -285,7 +288,7 @@ runs:
       if: ${{ !cancelled() }}
       uses: ./splice-shared-gha/.github/actions/sbt/post_sbt
       with:
-        cache_version: 7
+        cache_version: ${{ input.cache_version }}
         setup_sbt_cache_hits: ${{ steps.setup_sbt.outputs.cache_hits }}
         # Save caches only from one runner, to reduce conflicts on the save
         save_caches: ${{ inputs.runner_index == 0 && inputs.test_suite_name == 'wall-clock-time' }}
