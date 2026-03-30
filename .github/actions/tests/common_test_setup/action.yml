@@ -39,6 +39,9 @@ inputs:
     description: "The service account to use for uploading the cache"
     required: false
     default: ""
+  cache_version:
+    description: "Cache version"
+    required: true
 
 outputs:
   sbt_cache_hits:
@@ -69,7 +72,7 @@ runs:
       with:
         artifactory_user: ${{ inputs.artifactory_user }}
         artifactory_password: ${{ inputs.artifactory_password }}
-        cache_version: 7
+        cache_version: ${{ inputs.cache_version }}
         should_save: ${{ inputs.save_nix_cache }}
         should_save_gcp: ${{ inputs.save_nix_cache_to_gcp }}
         target: ${{ inputs.target }}
@@ -81,4 +84,4 @@ runs:
       id: setup_sbt
       uses: ./splice-shared-gha/.github/actions/sbt/setup_sbt
       with:
-        cache_version: 7
+        cache_version: ${{ inputs.cache_version }}
