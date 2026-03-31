@@ -55,11 +55,6 @@ runs:
         echo "artifactory_user and artifactory_password must be provided if not using OSS only dependencies."
         exit 1
 
-    - name: Publish test name metric
-      uses: miguelteixeiraa/action-run-in-background@e28f036c202e9066287e6a50ce8b80749627cc7d # v1.0.0
-      with:
-        script: ./.github/actions/scripts/publish_gha_metrics.py --test_suite ${{ inputs.test_name }}
-
     - name: Setup
       shell: bash
       run: ./splice-shared-gha/.github/actions/scripts/common_setup.sh
