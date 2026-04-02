@@ -87,32 +87,38 @@ jobs:
           # Filter files for the patch
           EXPECTED_FILE_REGEX="cluster/expected/.*/expected.*\.json"
           RESOLVED_CONFIG_FILE_REGEX="cluster/deployment/.*/config\.resolved\.yaml"
-          FILES_TO_PATCH="$(echo "$ALL_CHANGED_FILES" | grep -v "^splice$" | grep -v -E "$EXPECTED_FILE_REGEX|$RESOLVED_CONFIG_FILE_REGEX")"
-          # Create and apply patch
-          if [ -n "$FILES_TO_PATCH" ]; then
-            echo "Applying patch"
-            echo "$FILES_TO_PATCH" | \
-              grep . | \
-              xargs --delimiter='\n' git diff $commit_sha^ $commit_sha -- | \
-              git apply --index
-            echo "Patch succeeded, committing"
-            git commit --author="$(git show -s --format='%an <%ae>' $commit_sha)" \
-              --date="$(git show -s --format='%ad' $commit_sha)" \
-              -m "$(git show -s --format='%B' $commit_sha)"
-          else
-            echo "No files to patch after filtering."
+          git cherry-pick --no-commit "$commit_sha" || true
+          conflicted_files=$(git diff --name-only --diff-filter=U)
+          if [ -n "$conflicted_files" ]; then
+            echo "$conflicted_files" | while IFS= read -r file; do
+              echo "Unstaging conflicting file $file"
+              git restore --staged "$file"
+            done
           fi
-          # Handle expected json files
-          UPDATED_EXPECTED=false
-          if echo "$ALL_CHANGED_FILES" | grep -q -E "$EXPECTED_FILE_REGEX|$RESOLVED_CONFIG_FILE_REGEX"; then
+          git commit --author="$(git show -s --format='%an <%ae>' $commit_sha)" \
+            --date="$(git show -s --format='%ad' $commit_sha)" \
+            -m "$(git show -s --format='%B' $commit_sha)"
+          if echo "$conflicted_files" | grep -q -E "$EXPECTED_FILE_REGEX|$RESOLVED_CONFIG_FILE_REGEX"; then
+            echo "Regenerating expected files"
             if [ -d splice ]; then
               cd splice
               source .envrc.vars
               cd ..
             fi
             source .envrc.vars
+            git status
+            # TODO(#4366) Remove the npm install steps when the makefile dependencies work properly
+            cd cluster/pulumi
+            echo "Running npm ci in $(pwd)"
+            npm ci
+            cd ../..
+            if [ -d splice ]; then
+              cd splice/cluster/pulumi
+              echo "Running npm ci in $(pwd)"
+              npm ci
+              cd ../../..
+            fi
             make update-expected -j4
-            echo "Done updating expected files"
             if git status --porcelain | grep -q -E "$EXPECTED_FILE_REGEX|$RESOLVED_CONFIG_FILE_REGEX"; then
               git add cluster/expected/*/expected*.json
               # do not add scratchnet's symlinks
@@ -120,14 +126,13 @@ jobs:
                 ls cluster/deployment/*/config.resolved.yaml | grep -v "scratchnet" | xargs -r git add
               fi
               git commit -m "update expected" -s
-              UPDATED_EXPECTED=true
             fi
-            # Check for any remaining uncommitted changes
-            if [ -n "$(git status --porcelain)" ]; then
-              echo "WARNING: There are uncommitted changes after updating expected files"
-              git status
-              exit 1
-            fi
+          fi
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "WARNING: There are uncommitted changes"
+            git status
+            git diff
+            exit 1
           fi
           git commit -m "[static]" -s --allow-empty
           git push origin $new_branch
