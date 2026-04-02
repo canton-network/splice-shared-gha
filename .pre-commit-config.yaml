@@ -1,3 +1,4 @@
+exclude: '^actions/.*.js'
 repos:
   - repo: https://github.com/koalaman/shellcheck-precommit
     rev: v0.11.0
@@ -28,3 +29,9 @@ repos:
         args: ['pin-github-action']
         files: '^.github/workflows/'
         types: [yaml]
+      - id: build
+        name: Make sure actions are built.
+        language: system
+        entry: ./scripts/check-build.sh
+        pass_filenames: false
+        files: '(^package\.json$|^package-lock\.json$|^src/.*\.ts$)'
