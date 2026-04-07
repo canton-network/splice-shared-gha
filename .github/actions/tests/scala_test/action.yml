@@ -86,6 +86,9 @@ inputs:
   daml_base_version:
     description: "Splice version from which the initial-package-config should be chosen"
     required: true
+  protocol_version:
+    description: "Synchronizer Protocol Version"
+    required: true
   oss_only:
     description: "Restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts)"
     required: false
@@ -250,7 +253,7 @@ runs:
     - name: Run tests
       uses: ./splice-shared-gha/.github/actions/sbt/execute_sbt_command
       with:
-        extra_env_vars: "POSTGRES_DB=postgres POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres INITIAL_PACKAGE_VERSIONS=${{ steps.daml_package_versions.outputs.initial_package_versions }}"
+        extra_env_vars: "POSTGRES_DB=postgres POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres INITIAL_PACKAGE_VERSIONS=${{ steps.daml_package_versions.outputs.initial_package_versions }} PROTOCOL_VERSION=${{ inputs.protocol_version }}"
         artifactory_user: ${{ inputs.artifactory_user }}
         artifactory_password: ${{ inputs.artifactory_password }}
         cmd: ${{ steps.list_tests.outputs.RUN_SPLITTED_TESTS_CMD }}
