@@ -13,7 +13,18 @@ current_commit=$(git rev-parse HEAD)
 
 git config --global --add safe.directory "$(pwd)"
 echo "FETCHING ORIGIN"
-git fetch --tags --force origin
+for attempt in {1..3}; do
+  if git fetch --tags --force origin; then
+    break
+  else
+    echo "Fetch attempt $attempt failed. Retrying..."
+    if [ "$attempt" -eq 3 ]; then
+      echo "This was the last attempt. Exiting."
+      exit 1
+    fi
+    sleep 5
+  fi
+done
 echo "CHECKING OUT MAIN"
 git checkout main
 echo "GITHUB_HEAD_REF: ${GITHUB_HEAD_REF:-}"
@@ -22,7 +33,19 @@ if [ -n "${GITHUB_HEAD_REF:-}" ] && [ "$GITHUB_HEAD_REF" != "main" ]; then
   # On PRs from forks, GITHUB_HEAD_REF is the name of the branch in the forked repo, so we cannot actually checkout that branch directly.
   git checkout "$GITHUB_HEAD_REF" || true
 fi
-git fetch origin 'refs/heads/release-line*:refs/heads/origin/release-line*' --force
+echo "FETCHING RELEASE LINES"
+for attempt in {1..3}; do
+  if git fetch origin 'refs/heads/release-line*:refs/heads/origin/release-line*' --force; then
+    break
+  else
+    echo "Fetch attempt $attempt for release lines failed. Retrying..."
+    if [ "$attempt" -eq 3 ]; then
+      echo "This was the last attempt. Exiting."
+      exit 1
+    fi
+    sleep 5
+  fi
+done
 
 git checkout "$current_commit"
 
