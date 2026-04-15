@@ -5,6 +5,18 @@ inputs:
     description: "Delete cache entries older than this many days"
     required: false
     default: "30"
+  workload_identity_provider:
+    description: "Google Workload Identity Provider for failure notifications"
+    required: true
+  failure_notifications_sa:
+    description: "Service account for failure notifications"
+    required: true
+  failure_notifications_url:
+    description: "URL for failure notifications"
+    required: true
+  failure_notifications_slack_channel:
+    description: "Slack channel for failure notifications"
+    required: true
 
 runs:
   using: "composite"
@@ -38,7 +50,7 @@ runs:
       if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
       uses: ./splice-shared-gha/.github/actions/tests/failure_notifications
       with:
-        workload_identity_provider: '${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}'
-        service_account: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}'
-        notifications_url: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}'
-        slack_channel: '${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}'
+        workload_identity_provider: '${{ inputs.workload_identity_provider }}'
+        service_account: '${{ inputs.failure_notifications_sa }}'
+        notifications_url: '${{ inputs.failure_notifications_url }}'
+        slack_channel: '${{ inputs.failure_notifications_slack_channel }}'
