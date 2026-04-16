@@ -1,4 +1,4 @@
-import {getInput, setFailed, setOutput} from '@actions/core';
+import {getInput, setOutput} from '@actions/core';
 import {XMLParser} from 'fast-xml-parser';
 import fs from 'fs';
 
