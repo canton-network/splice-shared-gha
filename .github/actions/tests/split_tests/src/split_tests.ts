@@ -1,5 +1,5 @@
 import {getInput, setFailed, setOutput} from '@actions/core';
-import xmlParser from 'fast-xml-parser';
+import {XMLParser} from 'fast-xml-parser';
 import fs from 'fs';
 
 type TestTimes = { [name: string]: number };
@@ -9,7 +9,7 @@ function getTestSuiteTimesFromXml(testReportsDir: string): TestTimes {
     const options = {
         ignoreAttributes: false
     };
-    const parser = new xmlParser.XMLParser(options);
+    const parser = new XMLParser(options);
     const testTimes: TestTimes = {};
     try {
         fs.readdirSync(testReportsDir).forEach(file => {
