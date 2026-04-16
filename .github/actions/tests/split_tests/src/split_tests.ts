@@ -1,8 +1,10 @@
-import {getInput, setFailed, setOutput} from '@actions/core';
 import {XMLParser} from 'fast-xml-parser';
 import fs from 'fs';
 
 type TestTimes = { [name: string]: number };
+
+const importActionsCore: () => Promise<typeof import('@actions/core')> =
+    new Function('return import("@actions/core")') as () => Promise<typeof import('@actions/core')>;
 
 function getTestSuiteTimesFromXml(testReportsDir: string): TestTimes {
 
@@ -88,5 +90,15 @@ function computeBuckets(testReportsDir: string, testNamesFile: string, splitTota
     return buckets;
 }
 
-const buckets = computeBuckets(getInput('test_reports_dir'), getInput('test_names_file'), parseInt(getInput('split_total')));
-setOutput('test_names', JSON.stringify(buckets));
+async function run() {
+    const {getInput, setFailed, setOutput} = await importActionsCore();
+
+    try {
+        const buckets = computeBuckets(getInput('test_reports_dir'), getInput('test_names_file'), parseInt(getInput('split_total')));
+        setOutput('test_names', JSON.stringify(buckets));
+    } catch (error) {
+        setFailed(error instanceof Error ? error.message : String(error));
+    }
+}
+
+void run();
