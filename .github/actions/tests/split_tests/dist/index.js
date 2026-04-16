@@ -11,13 +11,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core_1 = __nccwpck_require__(7484);
-const fast_xml_parser_1 = __importDefault(__nccwpck_require__(591));
+const fast_xml_parser_1 = __nccwpck_require__(591);
 const fs_1 = __importDefault(__nccwpck_require__(9896));
 function getTestSuiteTimesFromXml(testReportsDir) {
     const options = {
         ignoreAttributes: false
     };
-    const parser = new fast_xml_parser_1.default.XMLParser(options);
+    const parser = new fast_xml_parser_1.XMLParser(options);
     const testTimes = {};
     try {
         fs_1.default.readdirSync(testReportsDir).forEach(file => {
