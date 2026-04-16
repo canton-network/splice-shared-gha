@@ -182,9 +182,13 @@ runs:
               }
               cmd_wrapper && break
 
+              exit_code="$?"
+
               # TODO(#615): support a conditional retry (cmd_retry_condition argument in CCI), used for retrying if VPN failed
 
               n=$[$n+1]
+
+              echo "Attempt $n failed with exit code $exit_code, retrying"
           done
 
           if [ $n -gt $MAX_RETRY ]; then
