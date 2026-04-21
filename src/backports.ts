@@ -96,7 +96,7 @@ async function getRelevantReleaseBranchesFromProdClusters(
       `cluster/deployment/${cluster}/config.resolved.yaml`,
     )
     const config = yaml.load(configYaml)
-    return [cluster, getReleaseReferencesFromConfig(config)] as const
+    return [cluster, getReleaseBranchFromConfig(config)] as const
   })
   const releaseBranchesByCluster = Object.fromEntries(await Promise.all(results))
   const relevantReleaseBranches = await findLatestReleaseBranchesUpTo(github, releaseBranchesByCluster['mainnet'])
@@ -106,16 +106,24 @@ async function getRelevantReleaseBranchesFromProdClusters(
   return [relevantReleaseBranches, explanation] as const
 }
 
-function getReleaseReferencesFromConfig(
+function getReleaseBranchFromConfig(
   config: unknown,
 ): string {
   const untypedConfig = config as any
+  let reference
   try {
-    return untypedConfig.synchronizerMigration.active.releaseReference.gitReference as string
+    reference = untypedConfig.synchronizerMigration.active.releaseReference.gitReference
   } catch (e) {
-    console.error('Failed to read synchronizerMigration config.')
+    console.error(`Failed to read synchronizerMigration config.\n${JSON.stringify(untypedConfig?.synchronizerMigration)}`, e)
     throw e
   }
+  if (typeof reference !== 'string') {
+    throw new Error(`'synchronizerMigration.active.releaseReference.gitReference' is not a string but ${typeof reference}.`)
+  }
+  const releaseBranch = reference.startsWith('refs/heads/')
+    ? reference.slice('refs/heads/'.length)
+    : reference
+  return releaseBranch
 }
 
 function formatBackportReminderComment(
