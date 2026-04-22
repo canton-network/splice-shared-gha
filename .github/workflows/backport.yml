@@ -90,8 +90,8 @@ jobs:
           conflicted_files=$(git diff --name-only --diff-filter=U)
           if [ -n "$conflicted_files" ]; then
             echo "$conflicted_files" | while IFS= read -r file; do
-              echo "Unstaging conflicting file $file"
-              git restore --staged "$file"
+              echo "Resetting conflicting file $file"
+              git reset "$file"
             done
           fi
           git commit --author="$(git show -s --format='%an <%ae>' $commit_sha)" \
