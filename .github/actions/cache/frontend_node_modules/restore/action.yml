@@ -6,7 +6,7 @@ inputs:
     required: true
   splice_root:
     description: "Path to splice repo"
-    default: ${{ github.repository == 'hyperledger-labs/splice' && '.' || 'splice' }}
+    default: ${{ github.repository == 'canton-network/splice' && '.' || 'splice' }}
 outputs:
   cache_hit:
     description: "Cache hit"
