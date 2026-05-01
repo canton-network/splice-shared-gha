@@ -19516,7 +19516,7 @@ async function getFileFromGit(github, context3, ref, path) {
 
 // src/releases.ts
 var spliceRepo = {
-  owner: "hyperledger-labs",
+  owner: "canton-network",
   repo: "splice"
 };
 async function findLatestReleaseBranchesUpTo(github, oldestReleaseBranch) {

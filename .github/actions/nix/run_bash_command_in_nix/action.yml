@@ -29,7 +29,7 @@ inputs:
     default: "false"
   splice_root:
     description: "Path to splice repo"
-    default: ${{ github.repository == 'hyperledger-labs/splice' && '.' || 'splice' }}
+    default: ${{ github.repository == 'canton-network/splice' && '.' || 'splice' }}
 runs:
   using: 'composite'
   steps:
