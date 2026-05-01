@@ -2,7 +2,7 @@ import type { Github } from './types'
 import { getFileFromGit } from './git'
 
 const spliceRepo = {
-  owner: 'hyperledger-labs',
+  owner: 'canton-network',
   repo: 'splice',
 }
 
