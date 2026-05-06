@@ -140,14 +140,15 @@ runs:
           trusted-substituters = file:///cache/nix/binary_cache_uncompressed?trusted=1
           trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
           # Parallelize NAR fetches from NFS aggressively.
-          max-substitution-jobs = 32
+          max-substitution-jobs = 64
           # File:// cache contents never change for a given hash; cache narinfo lookups for a long time.
           narinfo-cache-positive-ttl = 31536000
           narinfo-cache-negative-ttl = 0
           # Don't hit the network for the flake registry on every eval.
           flake-registry =
-          cores = 4
-          max-jobs = 16
+          # cores=0 means "use all available CPUs" inside each builder.
+          cores = 0
+          max-jobs = auto
         EOF
           sh <(curl -fsSL --retry 8 "https://releases.nixos.org/nix/nix-$NIX_BINARY_VERSION/install") --no-daemon
           sudo mkdir -p /etc/nix
@@ -166,7 +167,7 @@ runs:
           . ~/.nix-profile/etc/profile.d/nix.sh
 
           # Fast path: if the writer recorded the resolved devshell out-path, substitute that
-          # directly and skip flake evaluation entirely (saves 20-40s on every reader).
+          # directly and skip flake evaluation entirely
           OUTPATH_FILE="/cache/nix/binary_cache_uncompressed/devshell-${{ inputs.target }}-$(uname -m).outpath"
           if [[ -f "$OUTPATH_FILE" ]]; then
             OUTPATH=$(cat "$OUTPATH_FILE")
@@ -174,8 +175,6 @@ runs:
             nix copy --no-check-sigs \
               --from 'file:///cache/nix/binary_cache_uncompressed?trusted=1' \
               "$OUTPATH"
-            # Materialize the dev env without re-evaluating the flake.
-            nix print-dev-env "$OUTPATH" > /dev/null
           else
             echo "Slow path: no pre-resolved out-path, falling back to flake eval"
             nix develop path:${{ inputs.nix_path }}#${{ inputs.target }} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
