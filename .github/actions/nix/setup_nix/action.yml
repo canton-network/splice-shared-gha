@@ -49,7 +49,6 @@ runs:
       shell: bash
       run: |
         set -euxo pipefail
-        STEP_START=$(date +%s)
         NIX_BINARY_VERSION=2.32.1
         cd ${{ inputs.nix_path }}
         echo "NIX_BINARY_VERSION=$NIX_BINARY_VERSION" >> $GITHUB_ENV
@@ -71,7 +70,6 @@ runs:
 
         echo ${{ inputs.target }} > /tmp/nix_target # Create a file to indicate which target are we using (so we don't need to re-specifify target to run_bash_command_in_nix)
         echo ${{ inputs.nix_path }} > /tmp/nix_path # Create a file to indicate where the nix config is (so we don't need to re-specifify nix_path to run_bash_command_in_nix)
-        echo "::notice title=setup_nix timing::Compute cache Key took $(( $(date +%s) - STEP_START ))s"
 
     - name: Download cache (for non-self-hosted)
       if: ${{ !startsWith(runner.name, 'self-hosted') }}
@@ -107,7 +105,6 @@ runs:
       shell: bash
       run: |
         set -euxo pipefail
-        STEP_START=$(date +%s)
         sudo mkdir -p /nix/store
         sudo chown -R $(whoami):$(whoami) /nix
         if [ -f "/cache/nix/$cache_key/cached" ]; then
@@ -125,7 +122,6 @@ runs:
           sudo chown $(whoami):$(whoami) "/cache/nix/$cache_key"
           sudo chown $(whoami):$(whoami) "/cache/nix"
         fi
-        echo "::notice title=setup_nix timing::Restore nix step took $(( $(date +%s) - STEP_START ))s"
     - name: Setup Nix
       shell: bash
       run: |
@@ -232,7 +228,6 @@ runs:
           T=$(date +%s)
           DEVSHELL_OUT=$(nix build --no-link --print-out-paths "$DEVSHELL_ATTR")
           echo "Devshell out path: $DEVSHELL_OUT"
-          echo "::notice title=setup_nix timing::Save: nix build devshell took $(( $(date +%s) - T ))s"
 
           # Copy the entire local /nix/store to the NFS binary cache, uncompressed,
           # so readers don't pay xz-decompression cost on every job.
@@ -278,7 +273,6 @@ runs:
           # sudo ${CLONE_COMMAND} /nix/var/ "/cache/nix/$cache_key/nix_store/var"
 
           echo "done" > "/cache/nix/$cache_key/cached"
-          echo "::notice title=setup_nix timing::Save: rclone HOME bits + finalize took $(( $(date +%s) - T ))s"
         fi
         echo "::notice title=setup_nix timing::Save nix cache step took $(( $(date +%s) - STEP_START ))s"
 
