@@ -119,6 +119,22 @@ runs:
           sudo chown $(whoami):$(whoami) "/cache/nix/$cache_key"
           sudo chown $(whoami):$(whoami) "/cache/nix"
         fi
+
+        # Restore Nix's flake/eval cache from NFS if available. This avoids the
+        # ~30-60s of `evaluating file '...'` on the first `nix develop` per job.
+        # The eval cache is keyed by the locked flake hash so it's safe to share:
+        # if the flake changed, Nix will simply re-evaluate. The directory name
+        # encodes the eval-cache schema version (-v5/-v6/...) and must match the
+        # Nix binary version, which is pinned via $NIX_BINARY_VERSION.
+        EVAL_CACHE_SRC="/cache/nix/eval-cache-${cache_key}"
+        if [ -d "$EVAL_CACHE_SRC" ]; then
+          echo "Restoring nix eval cache from $EVAL_CACHE_SRC"
+          mkdir -p "$HOME/.cache/nix"
+          # Copy each versioned eval-cache dir (e.g. eval-cache-v5) into place.
+          rsync -a "$EVAL_CACHE_SRC/" "$HOME/.cache/nix/"
+        else
+          echo "No nix eval cache snapshot at $EVAL_CACHE_SRC; first run will populate it"
+        fi
     - name: Setup Nix
       shell: bash
       run: |
@@ -226,6 +242,25 @@ runs:
 
           # Persist the resolved devshell out-path so readers can skip flake evaluation.
           echo "$DEVSHELL_OUT" > "/cache/nix/binary_cache_uncompressed/devshell-${NIX_TARGET}-$(uname -m).outpath"
+
+          # Snapshot Nix's eval cache so readers can skip the per-job flake evaluation.
+          # By the time we run here the "Invoke nix before saving cache" step has
+          # already done a `nix develop`, so ~/.cache/nix/eval-cache-v*/<hash>.sqlite
+          # is populated and consistent with the closure we just published.
+          EVAL_CACHE_DST="/cache/nix/eval-cache-${cache_key}"
+          if compgen -G "$HOME/.cache/nix/eval-cache-v*" > /dev/null; then
+            echo "Snapshotting nix eval cache to $EVAL_CACHE_DST"
+            rm -rf "$EVAL_CACHE_DST.tmp"
+            mkdir -p "$EVAL_CACHE_DST.tmp"
+            # Only copy the eval-cache-v* dirs, not the whole ~/.cache/nix tree.
+            rsync -a --include='eval-cache-v*/***' --exclude='*' \
+              "$HOME/.cache/nix/" "$EVAL_CACHE_DST.tmp/"
+            # Atomic-ish swap so readers never see a half-written snapshot.
+            rm -rf "$EVAL_CACHE_DST"
+            mv "$EVAL_CACHE_DST.tmp" "$EVAL_CACHE_DST"
+          else
+            echo "No local eval cache to snapshot (this should not happen on the writer)"
+          fi
 
           CLONE_COMMAND="rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=32 --transfers=32 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata --order-by name,mixed --retries 10 copy"
           ${CLONE_COMMAND} "$HOME/" "/cache/nix/$cache_key/" --include ".nix-*/**" --include ".nix-*"
