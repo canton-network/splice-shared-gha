@@ -103,9 +103,7 @@ runs:
       run: |
         set -euxo pipefail
         sudo mkdir -p /nix/store
-        sudo mkdir -p /cache/nix/binary_cache_uncompressed
         sudo chown -R $(whoami):$(whoami) /nix
-        sudo chown $(whoami):$(whoami) /cache/nix/binary_cache_uncompressed
         if [ -f "/cache/nix/$cache_key/cached" ]; then
           echo "Restoring nix cache (key $cache_key)"
           # we use rsync here because it's simply faster to install
@@ -118,22 +116,6 @@ runs:
           sudo mkdir -p "/cache/nix/$cache_key"
           sudo chown $(whoami):$(whoami) "/cache/nix/$cache_key"
           sudo chown $(whoami):$(whoami) "/cache/nix"
-        fi
-
-        # Restore Nix's flake/eval cache from NFS if available. This avoids the
-        # ~30-60s of `evaluating file '...'` on the first `nix develop` per job.
-        # The eval cache is keyed by the locked flake hash so it's safe to share:
-        # if the flake changed, Nix will simply re-evaluate. The directory name
-        # encodes the eval-cache schema version (-v5/-v6/...) and must match the
-        # Nix binary version, which is pinned via $NIX_BINARY_VERSION.
-        EVAL_CACHE_SRC="/cache/nix/eval-cache-${cache_key}"
-        if [ -d "$EVAL_CACHE_SRC" ]; then
-          echo "Restoring nix eval cache from $EVAL_CACHE_SRC"
-          mkdir -p "$HOME/.cache/nix"
-          # Copy each versioned eval-cache dir (e.g. eval-cache-v5) into place.
-          rsync -a "$EVAL_CACHE_SRC/" "$HOME/.cache/nix/"
-        else
-          echo "No nix eval cache snapshot at $EVAL_CACHE_SRC; first run will populate it"
         fi
     - name: Setup Nix
       shell: bash
@@ -180,21 +162,8 @@ runs:
           export USER=$(whoami)
           echo "Running nix.sh"
           . ~/.nix-profile/etc/profile.d/nix.sh
-
-          # Fast path: if the writer recorded the resolved devshell out-path, substitute that
-          # directly and skip flake evaluation entirely
-          OUTPATH_FILE="/cache/nix/binary_cache_uncompressed/devshell-${{ inputs.target }}-$(uname -m).outpath"
-          if [[ -f "$OUTPATH_FILE" ]]; then
-            OUTPATH=$(cat "$OUTPATH_FILE")
-            echo "Fast path: substituting pre-resolved devshell $OUTPATH"
-            nix copy --no-check-sigs \
-              --from 'file:///cache/nix/binary_cache_uncompressed?trusted=1' \
-              "$OUTPATH"
-          else
-            echo "Slow path: no pre-resolved out-path, falling back to flake eval"
             nix develop path:${{ inputs.nix_path }}#${{ inputs.target }} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
           fi
-        fi
 
     - name: Invoke nix before saving cache
       if: ${{ github.repository == 'canton-network/splice' }}
@@ -223,40 +192,7 @@ runs:
           export USER=$(whoami)
           . ~/.nix-profile/etc/profile.d/nix.sh
 
-          # Copy the entire local /nix/store to the NFS binary cache, uncompressed,
-          # so readers don't pay xz-decompression cost on every job.
-          NIX_PATH_DIR=$(cat /tmp/nix_path)
-          NIX_TARGET=$(cat /tmp/nix_target)
-          SYSTEM=$(nix eval --impure --raw --expr 'builtins.currentSystem')
-          DEVSHELL_ATTR="path:${NIX_PATH_DIR}#devShells.${SYSTEM}.${NIX_TARGET}"
-
-          # Make sure the devshell is realised so its out-path is valid in the store.
-          DEVSHELL_OUT=$(nix build --no-link --print-out-paths "$DEVSHELL_ATTR")
-          echo "Devshell out path: $DEVSHELL_OUT"
-
-          nix copy --all --to 'file:///cache/nix/binary_cache_uncompressed?trusted=1&compression=none' -v
-
-          # Persist the resolved devshell out-path so readers can skip flake evaluation.
-          echo "$DEVSHELL_OUT" > "/cache/nix/binary_cache_uncompressed/devshell-${NIX_TARGET}-$(uname -m).outpath"
-
-          # Snapshot Nix's eval cache so readers can skip the per-job flake evaluation.
-          # By the time we run here the "Invoke nix before saving cache" step has
-          # already done a `nix develop`, so ~/.cache/nix/eval-cache-v*/<hash>.sqlite
-          # is populated and consistent with the closure we just published.
-          EVAL_CACHE_DST="/cache/nix/eval-cache-${cache_key}"
-          if compgen -G "$HOME/.cache/nix/eval-cache-v*" > /dev/null; then
-            echo "Snapshotting nix eval cache to $EVAL_CACHE_DST"
-            rm -rf "$EVAL_CACHE_DST.tmp"
-            mkdir -p "$EVAL_CACHE_DST.tmp"
-            # Only copy the eval-cache-v* dirs, not the whole ~/.cache/nix tree.
-            rsync -a --include='eval-cache-v*/***' --exclude='*' \
-              "$HOME/.cache/nix/" "$EVAL_CACHE_DST.tmp/"
-            # Atomic-ish swap so readers never see a half-written snapshot.
-            rm -rf "$EVAL_CACHE_DST"
-            mv "$EVAL_CACHE_DST.tmp" "$EVAL_CACHE_DST"
-          else
-            echo "No local eval cache to snapshot (this should not happen on the writer)"
-          fi
+          nix copy --all --to 'file:///cache/nix/binary_cache?trusted=1&compression=none' -v
 
           CLONE_COMMAND="rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=32 --transfers=32 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata --order-by name,mixed --retries 10 copy"
           ${CLONE_COMMAND} "$HOME/" "/cache/nix/$cache_key/" --include ".nix-*/**" --include ".nix-*"
