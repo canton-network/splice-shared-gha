@@ -155,8 +155,8 @@ runs:
           narinfo-cache-negative-ttl = 0
           # Don't hit the network for the flake registry on every eval.
           flake-registry =
-          cores = 6
-          max-jobs = 32
+          cores = 0
+          max-jobs = auto
         EOF
           sh <(curl -fsSL --retry 8 "https://releases.nixos.org/nix/nix-$NIX_BINARY_VERSION/install") --no-daemon
           T_INSTALL=$(date +%s)
