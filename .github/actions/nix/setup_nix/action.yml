@@ -137,6 +137,13 @@ runs:
           substituters = file:///cache/nix/binary_cache?trusted=1 https://cache.nixos.org/
           trusted-substituters = file:///cache/nix/binary_cache?trusted=1
           trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+          # Parallelize NAR fetches from NFS aggressively.
+          max-substitution-jobs = 32
+          # File:// cache contents never change for a given hash; cache narinfo lookups for a long time.
+          narinfo-cache-positive-ttl = 31536000
+          narinfo-cache-negative-ttl = 0
+          # Don't hit the network for the flake registry on every eval.
+          flake-registry =
           cores = 4
           max-jobs = 16
         EOF
@@ -155,7 +162,22 @@ runs:
           export USER=$(whoami)
           echo "Running nix.sh"
           . ~/.nix-profile/etc/profile.d/nix.sh
-          nix develop path:${{ inputs.nix_path }}#${{ inputs.target }} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
+
+          # Fast path: if the writer recorded the resolved devshell out-path, substitute that
+          # directly and skip flake evaluation entirely (saves 20-40s on every reader).
+          OUTPATH_FILE="/cache/nix/binary_cache/devshell-${{ inputs.target }}-$(uname -m).outpath"
+          if [[ -f "$OUTPATH_FILE" ]]; then
+            OUTPATH=$(cat "$OUTPATH_FILE")
+            echo "Fast path: substituting pre-resolved devshell $OUTPATH"
+            nix copy --no-check-sigs \
+              --from 'file:///cache/nix/binary_cache?trusted=1' \
+              "$OUTPATH"
+            # Materialize the dev env without re-evaluating the flake.
+            nix print-dev-env "$OUTPATH" > /dev/null
+          else
+            echo "Slow path: no pre-resolved out-path, falling back to flake eval"
+            nix develop path:${{ inputs.nix_path }}#${{ inputs.target }} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
+          fi
         fi
 
     - name: Invoke nix before saving cache
@@ -188,7 +210,17 @@ runs:
           echo "Garbage collecting to reduce cache size"
           nix-collect-garbage --delete-older-than 30d
 
-          nix copy --all --to 'file:///cache/nix/binary_cache?trusted=1' -v
+          # Only copy the devshell closure(s) we actually need, uncompressed,
+          # so readers don't pay xz-decompression cost on every job.
+          # `--all` copies the whole local /nix/store including unrelated paths.
+          NIX_PATH_DIR=$(cat /tmp/nix_path)
+          NIX_TARGET=$(cat /tmp/nix_target)
+          DEVSHELL_OUT=$(nix path-info --recursive "path:${NIX_PATH_DIR}#devShells.$(nix eval --impure --raw --expr 'builtins.currentSystem').${NIX_TARGET}")
+          echo "$DEVSHELL_OUT" | nix copy --stdin --to 'file:///cache/nix/binary_cache?trusted=1&compression=none' -v
+
+          # Persist the resolved devshell out-path so readers can skip flake evaluation.
+          nix build --no-link --print-out-paths "path:${NIX_PATH_DIR}#${NIX_TARGET}" \
+            > "/cache/nix/binary_cache/devshell-${NIX_TARGET}-$(uname -m).outpath"
 
           CLONE_COMMAND="rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=32 --transfers=32 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata --order-by name,mixed --retries 10 copy"
           ${CLONE_COMMAND} "$HOME/" "/cache/nix/$cache_key/" --include ".nix-*/**" --include ".nix-*"
