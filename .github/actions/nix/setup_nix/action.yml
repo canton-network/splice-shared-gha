@@ -60,6 +60,7 @@ runs:
         echo "home: $HOME" >> /tmp/nix-cache-key # important when restoring simlinks from cache, apparently
         echo "nix binary version: $NIX_BINARY_VERSION" >> /tmp/nix-cache-key # different nix versions might behave differently and corrupt the caches
         echo "target: ${{ inputs.target }}" >> /tmp/nix-cache-key
+        echo "local-key-1" >> /tmp/nix-cache-key
         if [ "${{ inputs.target }}" != 'default' ]; then
           echo "Using OSS only dependencies"
         fi
