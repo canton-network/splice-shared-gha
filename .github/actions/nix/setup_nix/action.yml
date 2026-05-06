@@ -162,9 +162,8 @@ runs:
           narinfo-cache-negative-ttl = 0
           # Don't hit the network for the flake registry on every eval.
           flake-registry =
-          # cores=0 means "use all available CPUs" inside each builder.
-          cores = 0
-          max-jobs = auto
+          cores = 6
+          max-jobs = 32
         EOF
           sh <(curl -fsSL --retry 8 "https://releases.nixos.org/nix/nix-$NIX_BINARY_VERSION/install") --no-daemon
           sudo mkdir -p /etc/nix
@@ -223,9 +222,6 @@ runs:
           echo "sourcing nix profile"
           export USER=$(whoami)
           . ~/.nix-profile/etc/profile.d/nix.sh
-
-          echo "Garbage collecting to reduce cache size"
-          nix-collect-garbage --delete-older-than 30d
 
           # Copy the entire local /nix/store to the NFS binary cache, uncompressed,
           # so readers don't pay xz-decompression cost on every job.
