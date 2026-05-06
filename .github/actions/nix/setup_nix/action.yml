@@ -49,6 +49,7 @@ runs:
       shell: bash
       run: |
         set -euxo pipefail
+        STEP_START=$(date +%s)
         NIX_BINARY_VERSION=2.32.1
         cd ${{ inputs.nix_path }}
         echo "NIX_BINARY_VERSION=$NIX_BINARY_VERSION" >> $GITHUB_ENV
@@ -60,7 +61,7 @@ runs:
         echo "home: $HOME" >> /tmp/nix-cache-key # important when restoring simlinks from cache, apparently
         echo "nix binary version: $NIX_BINARY_VERSION" >> /tmp/nix-cache-key # different nix versions might behave differently and corrupt the caches
         echo "target: ${{ inputs.target }}" >> /tmp/nix-cache-key
-        echo "local-key-2" >> /tmp/nix-cache-key
+        echo "local-key-3" >> /tmp/nix-cache-key
         if [ "${{ inputs.target }}" != 'default' ]; then
           echo "Using OSS only dependencies"
         fi
@@ -70,12 +71,14 @@ runs:
 
         echo ${{ inputs.target }} > /tmp/nix_target # Create a file to indicate which target are we using (so we don't need to re-specifify target to run_bash_command_in_nix)
         echo ${{ inputs.nix_path }} > /tmp/nix_path # Create a file to indicate where the nix config is (so we don't need to re-specifify nix_path to run_bash_command_in_nix)
+        echo "::notice title=setup_nix timing::Compute cache Key took $(( $(date +%s) - STEP_START ))s"
 
     - name: Download cache (for non-self-hosted)
       if: ${{ !startsWith(runner.name, 'self-hosted') }}
       shell: bash
       run: |
         set -euxo pipefail
+        STEP_START=$(date +%s)
 
         if [[ ${{ inputs.target }} == 'default' ]]; then
           echo "Must use OSS only dependencies in GitHub-hosted runners"
@@ -97,19 +100,23 @@ runs:
         if [ -s cache.tar.gz ]; then
           sudo tar -xzf cache.tar.gz -C /cache/nix/${cache_key}
         fi
+        echo "::notice title=setup_nix timing::Download cache (non-self-hosted) took $(( $(date +%s) - STEP_START ))s"
 
     - name: Restore nix
       id: restore_nix
       shell: bash
       run: |
         set -euxo pipefail
+        STEP_START=$(date +%s)
         sudo mkdir -p /nix/store
         sudo chown -R $(whoami):$(whoami) /nix
         if [ -f "/cache/nix/$cache_key/cached" ]; then
           echo "Restoring nix cache (key $cache_key)"
+          T=$(date +%s)
           # we use rsync here because it's simply faster to install
           rsync -avi /cache/nix/$cache_key/.nix-* $HOME/
           rsync -avi "/cache/nix/$cache_key/nix" $HOME/.config/
+          echo "::notice title=setup_nix timing::Restore: rsync .nix-* + nix.conf took $(( $(date +%s) - T ))s"
           # TODO (#2663): fix & uncomment these two lines
           # rsync -avi "/cache/nix/$cache_key/nix_store/var/" /nix/var
           # sudo mount --bind /cache/nix/$cache_key/nix_store/store /nix/store
@@ -118,13 +125,16 @@ runs:
           sudo chown $(whoami):$(whoami) "/cache/nix/$cache_key"
           sudo chown $(whoami):$(whoami) "/cache/nix"
         fi
+        echo "::notice title=setup_nix timing::Restore nix step took $(( $(date +%s) - STEP_START ))s"
     - name: Setup Nix
       shell: bash
       run: |
         set -exuo pipefail
+        STEP_START=$(date +%s)
         echo 'source ~/.nix-profile/etc/profile.d/nix.sh' > nix.rc
         if [[ -f ~/.config/nix/nix.conf && -f ~/.nix-profile/etc/profile.d/nix.sh ]]; then
           echo "nix.conf or nix.sh already exists, skipping Nix setup"
+          echo "::notice title=setup_nix timing::Setup Nix step (skipped, already configured) took $(( $(date +%s) - STEP_START ))s"
           exit 0
         else
           # Disabling sandbox because:
@@ -149,6 +159,8 @@ runs:
           max-jobs = 32
         EOF
           sh <(curl -fsSL --retry 8 "https://releases.nixos.org/nix/nix-$NIX_BINARY_VERSION/install") --no-daemon
+          T_INSTALL=$(date +%s)
+          echo "::notice title=setup_nix timing::Setup: nix installer took $(( T_INSTALL - STEP_START ))s"
           sudo mkdir -p /etc/nix
           sudo chmod a+rw /etc/nix
           if [[ "${{ inputs.target }}" != 'default' ]]; then
@@ -167,17 +179,21 @@ runs:
           # Fast path: if the writer recorded the resolved devshell out-path, substitute that
           # directly and skip flake evaluation entirely
           OUTPATH_FILE="/cache/nix/binary_cache_uncompressed/devshell-${{ inputs.target }}-$(uname -m).outpath"
+          T_PATH_START=$(date +%s)
           if [[ -f "$OUTPATH_FILE" ]]; then
             OUTPATH=$(cat "$OUTPATH_FILE")
             echo "Fast path: substituting pre-resolved devshell $OUTPATH"
             nix copy --no-check-sigs \
               --from 'file:///cache/nix/binary_cache_uncompressed?trusted=1' \
               "$OUTPATH"
+            echo "::notice title=setup_nix timing::Setup: fast-path nix copy took $(( $(date +%s) - T_PATH_START ))s"
           else
             echo "Slow path: no pre-resolved out-path, falling back to flake eval"
             nix develop path:${{ inputs.nix_path }}#${{ inputs.target }} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
+            echo "::notice title=setup_nix timing::Setup: slow-path nix develop took $(( $(date +%s) - T_PATH_START ))s"
           fi
         fi
+        echo "::notice title=setup_nix timing::Setup Nix step took $(( $(date +%s) - STEP_START ))s"
 
     - name: Invoke nix before saving cache
       if: ${{ github.repository == 'canton-network/splice' }}
@@ -193,6 +209,7 @@ runs:
       if: ${{ inputs.should_save == 'true' }}
       run: |
         set -euxo pipefail
+        STEP_START=$(date +%s)
         echo ~
         chown -R $(whoami):$(whoami) ~
         cat /tmp/nix-cache-key
@@ -212,12 +229,16 @@ runs:
           DEVSHELL_ATTR="path:${NIX_PATH_DIR}#devShells.${SYSTEM}.${NIX_TARGET}"
 
           # Make sure the devshell is realised so its out-path is valid in the store.
+          T=$(date +%s)
           DEVSHELL_OUT=$(nix build --no-link --print-out-paths "$DEVSHELL_ATTR")
           echo "Devshell out path: $DEVSHELL_OUT"
+          echo "::notice title=setup_nix timing::Save: nix build devshell took $(( $(date +%s) - T ))s"
 
           # Copy the entire local /nix/store to the NFS binary cache, uncompressed,
           # so readers don't pay xz-decompression cost on every job.
+          T=$(date +%s)
           nix copy --all --to 'file:///cache/nix/binary_cache_uncompressed?trusted=1&compression=none' -v
+          echo "::notice title=setup_nix timing::Save: nix copy --all took $(( $(date +%s) - T ))s"
 
           # Persist the resolved devshell out-path so readers can skip flake evaluation.
           echo "$DEVSHELL_OUT" > "/cache/nix/binary_cache_uncompressed/devshell-${NIX_TARGET}-$(uname -m).outpath"
@@ -226,6 +247,7 @@ runs:
           # By the time we run here the "Invoke nix before saving cache" step has
           # already done a `nix develop`, so ~/.cache/nix/eval-cache-v*/<hash>.sqlite
           # is populated and consistent with the closure we just published.
+          T=$(date +%s)
           EVAL_CACHE_DST="/cache/nix/eval-cache-${cache_key}"
           if compgen -G "$HOME/.cache/nix/eval-cache-v*" > /dev/null; then
             echo "Snapshotting nix eval cache to $EVAL_CACHE_DST"
@@ -240,7 +262,9 @@ runs:
           else
             echo "No local eval cache to snapshot (this should not happen on the writer)"
           fi
+          echo "::notice title=setup_nix timing::Save: snapshot eval cache took $(( $(date +%s) - T ))s"
 
+          T=$(date +%s)
           CLONE_COMMAND="rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=32 --transfers=32 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata --order-by name,mixed --retries 10 copy"
           ${CLONE_COMMAND} "$HOME/" "/cache/nix/$cache_key/" --include ".nix-*/**" --include ".nix-*"
           ${CLONE_COMMAND} $HOME/.config/nix "/cache/nix/$cache_key/nix"
@@ -254,7 +278,9 @@ runs:
           # sudo ${CLONE_COMMAND} /nix/var/ "/cache/nix/$cache_key/nix_store/var"
 
           echo "done" > "/cache/nix/$cache_key/cached"
+          echo "::notice title=setup_nix timing::Save: rclone HOME bits + finalize took $(( $(date +%s) - T ))s"
         fi
+        echo "::notice title=setup_nix timing::Save nix cache step took $(( $(date +%s) - STEP_START ))s"
 
     - name: Check if cache already exists in GCP
       id: already_exists
