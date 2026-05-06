@@ -103,7 +103,9 @@ runs:
       run: |
         set -euxo pipefail
         sudo mkdir -p /nix/store
+        sudo mkdir -p /cache/nix/binary_cache_uncompressed
         sudo chown -R $(whoami):$(whoami) /nix
+        sudo chown $(whoami):$(whoami) /cache/nix/binary_cache_uncompressed
         if [ -f "/cache/nix/$cache_key/cached" ]; then
           echo "Restoring nix cache (key $cache_key)"
           # we use rsync here because it's simply faster to install
@@ -134,8 +136,8 @@ runs:
           sandbox = false
           netrc-file = /etc/nix/netrc
           extra-experimental-features = nix-command flakes
-          substituters = file:///cache/nix/binary_cache?trusted=1 https://cache.nixos.org/
-          trusted-substituters = file:///cache/nix/binary_cache?trusted=1
+          substituters = file:///cache/nix/binary_cache_uncompressed?trusted=1 https://cache.nixos.org/
+          trusted-substituters = file:///cache/nix/binary_cache_uncompressed?trusted=1
           trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
           # Parallelize NAR fetches from NFS aggressively.
           max-substitution-jobs = 32
@@ -165,12 +167,12 @@ runs:
 
           # Fast path: if the writer recorded the resolved devshell out-path, substitute that
           # directly and skip flake evaluation entirely (saves 20-40s on every reader).
-          OUTPATH_FILE="/cache/nix/binary_cache/devshell-${{ inputs.target }}-$(uname -m).outpath"
+          OUTPATH_FILE="/cache/nix/binary_cache_uncompressed/devshell-${{ inputs.target }}-$(uname -m).outpath"
           if [[ -f "$OUTPATH_FILE" ]]; then
             OUTPATH=$(cat "$OUTPATH_FILE")
             echo "Fast path: substituting pre-resolved devshell $OUTPATH"
             nix copy --no-check-sigs \
-              --from 'file:///cache/nix/binary_cache?trusted=1' \
+              --from 'file:///cache/nix/binary_cache_uncompressed?trusted=1' \
               "$OUTPATH"
             # Materialize the dev env without re-evaluating the flake.
             nix print-dev-env "$OUTPATH" > /dev/null
@@ -210,17 +212,21 @@ runs:
           echo "Garbage collecting to reduce cache size"
           nix-collect-garbage --delete-older-than 30d
 
-          # Only copy the devshell closure(s) we actually need, uncompressed,
+          # Copy the entire local /nix/store to the NFS binary cache, uncompressed,
           # so readers don't pay xz-decompression cost on every job.
-          # `--all` copies the whole local /nix/store including unrelated paths.
           NIX_PATH_DIR=$(cat /tmp/nix_path)
           NIX_TARGET=$(cat /tmp/nix_target)
-          DEVSHELL_OUT=$(nix path-info --recursive "path:${NIX_PATH_DIR}#devShells.$(nix eval --impure --raw --expr 'builtins.currentSystem').${NIX_TARGET}")
-          echo "$DEVSHELL_OUT" | nix copy --stdin --to 'file:///cache/nix/binary_cache?trusted=1&compression=none' -v
+          SYSTEM=$(nix eval --impure --raw --expr 'builtins.currentSystem')
+          DEVSHELL_ATTR="path:${NIX_PATH_DIR}#devShells.${SYSTEM}.${NIX_TARGET}"
+
+          # Make sure the devshell is realised so its out-path is valid in the store.
+          DEVSHELL_OUT=$(nix build --no-link --print-out-paths "$DEVSHELL_ATTR")
+          echo "Devshell out path: $DEVSHELL_OUT"
+
+          nix copy --all --to 'file:///cache/nix/binary_cache_uncompressed?trusted=1&compression=none' -v
 
           # Persist the resolved devshell out-path so readers can skip flake evaluation.
-          nix build --no-link --print-out-paths "path:${NIX_PATH_DIR}#${NIX_TARGET}" \
-            > "/cache/nix/binary_cache/devshell-${NIX_TARGET}-$(uname -m).outpath"
+          echo "$DEVSHELL_OUT" > "/cache/nix/binary_cache_uncompressed/devshell-${NIX_TARGET}-$(uname -m).outpath"
 
           CLONE_COMMAND="rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=32 --transfers=32 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata --order-by name,mixed --retries 10 copy"
           ${CLONE_COMMAND} "$HOME/" "/cache/nix/$cache_key/" --include ".nix-*/**" --include ".nix-*"
@@ -229,9 +235,9 @@ runs:
           mkdir -p "/cache/nix/$cache_key/nix_store/store"
           mkdir -p "/cache/nix/$cache_key/nix_store/var"
 
-          #requires to preserve read only during clone
-          sudo ${CLONE_COMMAND} /nix/store/ /cache/nix/$cache_key/nix_store/store
-          # TODO (#2663): fix & uncomment this line
+          # requires to preserve read only during clone
+          # TODO (#2663): fix & uncomment these two lines
+          # sudo ${CLONE_COMMAND} /nix/store/ /cache/nix/$cache_key/nix_store/store
           # sudo ${CLONE_COMMAND} /nix/var/ "/cache/nix/$cache_key/nix_store/var"
 
           echo "done" > "/cache/nix/$cache_key/cached"
