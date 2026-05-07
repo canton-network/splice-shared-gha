@@ -116,6 +116,20 @@ runs:
           # TODO (#2663): fix & uncomment these two lines
           # rsync -avi "/cache/nix/$cache_key/nix_store/var/" /nix/var
           # sudo mount --bind /cache/nix/$cache_key/nix_store/store /nix/store
+
+          # Restore Nix's eval cache snapshot if available — eliminates per-job
+          # flake evaluation by reusing the writer's eval-cache-v*/<hash>.sqlite.
+          # The eval cache is just a hint: if missing/stale Nix re-evaluates, so
+          # this is a pure speedup with no correctness risk.
+          T_EC=$(date +%s)
+          EVAL_CACHE_SRC="/cache/nix/eval-cache-${cache_key}"
+          if [ -d "$EVAL_CACHE_SRC" ]; then
+            echo "Restoring nix eval cache from $EVAL_CACHE_SRC"
+            mkdir -p "$HOME/.cache/nix"
+            rsync -a "$EVAL_CACHE_SRC/" "$HOME/.cache/nix/"
+          else
+            echo "No eval cache snapshot at $EVAL_CACHE_SRC (writer hasn't run for this cache_key yet)"
+          fi
         else
           sudo mkdir -p "/cache/nix/$cache_key"
           sudo chown $(whoami):$(whoami) "/cache/nix/$cache_key"
@@ -171,22 +185,9 @@ runs:
           echo "Running nix.sh"
           . ~/.nix-profile/etc/profile.d/nix.sh
 
-          # Fast path: if the writer recorded the resolved devshell out-path, substitute that
-          # directly and skip flake evaluation entirely
-          OUTPATH_FILE="/cache/nix/binary_cache_uncompressed/devshell-${{ inputs.target }}-$(uname -m).outpath"
           T_PATH_START=$(date +%s)
-          if [[ -f "$OUTPATH_FILE" ]]; then
-            OUTPATH=$(cat "$OUTPATH_FILE")
-            echo "Fast path: substituting pre-resolved devshell $OUTPATH"
-            nix copy --no-check-sigs \
-              --from 'file:///cache/nix/binary_cache_uncompressed?trusted=1' \
-              "$OUTPATH"
-            echo "::notice title=setup_nix timing::Setup: fast-path nix copy took $(( $(date +%s) - T_PATH_START ))s"
-          else
-            echo "Slow path: no pre-resolved out-path, falling back to flake eval"
-            nix develop path:${{ inputs.nix_path }}#${{ inputs.target }} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
-            echo "::notice title=setup_nix timing::Setup: slow-path nix develop took $(( $(date +%s) - T_PATH_START ))s"
-          fi
+          nix develop path:${{ inputs.nix_path }}#${{ inputs.target }} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
+          echo "::notice title=setup_nix timing::Setup: nix develop took $(( $(date +%s) - T_PATH_START ))s"
         fi
         echo "::notice title=setup_nix timing::Setup Nix step took $(( $(date +%s) - STEP_START ))s"
 
@@ -220,13 +221,6 @@ runs:
 
           NIX_PATH_DIR=$(cat /tmp/nix_path)
           NIX_TARGET=$(cat /tmp/nix_target)
-          SYSTEM=$(nix eval --impure --raw --expr 'builtins.currentSystem')
-          DEVSHELL_ATTR="path:${NIX_PATH_DIR}#devShells.${SYSTEM}.${NIX_TARGET}"
-
-          # Make sure the devshell is realised so its out-path is valid in the store.
-          T=$(date +%s)
-          DEVSHELL_OUT=$(nix build --no-link --print-out-paths "$DEVSHELL_ATTR")
-          echo "Devshell out path: $DEVSHELL_OUT"
 
           # Copy the entire local /nix/store to the NFS binary cache, uncompressed,
           # so readers don't pay xz-decompression cost on every job.
@@ -234,8 +228,6 @@ runs:
           nix copy --all --to 'file:///cache/nix/binary_cache_uncompressed?trusted=1&compression=none' -v
           echo "::notice title=setup_nix timing::Save: nix copy --all took $(( $(date +%s) - T ))s"
 
-          # Persist the resolved devshell out-path so readers can skip flake evaluation.
-          echo "$DEVSHELL_OUT" > "/cache/nix/binary_cache_uncompressed/devshell-${NIX_TARGET}-$(uname -m).outpath"
 
           # Snapshot Nix's eval cache so readers can skip the per-job flake evaluation.
           # By the time we run here the "Invoke nix before saving cache" step has
