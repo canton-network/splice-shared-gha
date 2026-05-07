@@ -144,7 +144,7 @@ runs:
           trusted-substituters = file:///cache/nix/binary_cache_uncompressed?trusted=1
           trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
           # Parallelize NAR fetches from NFS aggressively.
-          max-substitution-jobs = 64
+          max-substitution-jobs = 32
           # File:// cache contents never change for a given hash; cache narinfo lookups for a long time.
           narinfo-cache-positive-ttl = 31536000
           narinfo-cache-negative-ttl = 0
