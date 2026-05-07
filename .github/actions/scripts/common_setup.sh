@@ -5,6 +5,7 @@
 
 set -euo pipefail
 
+# shellcheck disable=SC2034
 start_time=$SECONDS
 trap 'echo "::notice title=common_setup.sh::total elapsed: $((SECONDS - start_time))s"' EXIT
 
