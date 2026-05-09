@@ -221,6 +221,12 @@ runs:
       if: ${{ fromJson(inputs.with_docker_images) }}
       uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 #v3.6.0
 
+    - name: Test dockerfiles
+      if: ${{ fromJson(inputs.with_docker_images) }}
+      uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
+      with:
+        cmd: find cluster/images/ -name Dockerfile -exec scripts/check-base-images.py {} \;
+
     - name: Build Docker images
       if: ${{ fromJson(inputs.with_docker_images) }}
       uses: ./splice-shared-gha/.github/actions/nix/run_bash_command_in_nix
