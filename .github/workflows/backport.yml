@@ -97,7 +97,10 @@ jobs:
           git commit --author="$(git show -s --format='%an <%ae>' $commit_sha)" \
             --date="$(git show -s --format='%ad' $commit_sha)" \
             -m "$(git show -s --format='%B' $commit_sha)"
-          if echo "$conflicted_files" | grep -q -E "$EXPECTED_FILE_REGEX|$RESOLVED_CONFIG_FILE_REGEX"; then
+          if echo "$conflicted_files" | grep -v -E "$EXPECTED_FILE_REGEX|$RESOLVED_CONFIG_FILE_REGEX" | grep -q .; then
+            echo "Detected conflicts outside of expected files and resolved config files. Automated backport cannot proceed."
+            exit 1
+          else
             echo "Regenerating expected files"
             if [ -d splice ]; then
               cd splice
@@ -124,6 +127,8 @@ jobs:
               if [ -d splice ]; then
                 # shellcheck disable=SC2010
                 ls cluster/deployment/*/config.resolved.yaml | grep -v "scratchnet" | xargs -r git add
+              else
+                git add cluster/deployment/*/config.resolved.yaml
               fi
               git commit -m "update expected" -s
             fi
