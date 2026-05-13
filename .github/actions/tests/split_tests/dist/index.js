@@ -22966,9 +22966,9 @@ var XMLParser = class {
     this.options = buildOptions(options);
   }
   /**
-   * Parse XML dats to JS object
-   * @param {string|Uint8Array} xmlData
-   * @param {boolean|Object} validationOption
+   * Parse XML dats to JS object 
+   * @param {string|Uint8Array} xmlData 
+   * @param {boolean|Object} validationOption 
    */
   parse(xmlData, validationOption) {
     if (typeof xmlData !== "string" && xmlData.toString) {
@@ -22990,8 +22990,8 @@ var XMLParser = class {
   }
   /**
    * Add Entity which is not by default supported by this library
-   * @param {string} key
-   * @param {string} value
+   * @param {string} key 
+   * @param {string} value 
    */
   addEntity(key, value) {
     if (value.indexOf("&") !== -1) {
@@ -23007,10 +23007,10 @@ var XMLParser = class {
   /**
    * Returns a Symbol that can be used to access the metadata
    * property on a node.
-   *
+   * 
    * If Symbol is not available in the environment, an ordinary property is used
    * and the name of the property is here returned.
-   *
+   * 
    * The XMLMetaData property is only present when `captureMetaData`
    * is true in the options.
    */
