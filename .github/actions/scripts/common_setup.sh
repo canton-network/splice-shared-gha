@@ -45,7 +45,7 @@ fi
 echo "FETCHING LATEST RELEASE LINE"
 latest_release=$(cat LATEST_RELEASE)
 for attempt in {1..3}; do
-  if git fetch origin "refs/heads/release-line-${latest_release}:refs/heads/origin/release-line-${latest_release}" --force; then
+  if git fetch origin "refs/heads/release-line-${latest_release}:refs/remotes/origin/release-line-${latest_release}" --force; then
     break
   else
     echo "Fetch attempt $attempt for release line ${latest_release} failed. Retrying..."

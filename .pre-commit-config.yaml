@@ -13,9 +13,9 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0 # Use the ref you want to point at
     hooks:
-      - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: trailing-whitespace
+        exclude: .github/actions/tests/split_tests/dist/index.js # Exclude build output file
       - id: check-merge-conflict
       - id: check-yaml
       - id: mixed-line-ending
@@ -35,3 +35,9 @@ repos:
         entry: ./scripts/check-build.sh
         pass_filenames: false
         files: '(^package\.json$|^package-lock\.json$|^src/.*\.ts$)'
+      - id: build-split-tests
+        name: Build split_tests action
+        language: system
+        entry: bash -c 'cd .github/actions/tests/split_tests && npm ci && npm run build'
+        pass_filenames: false
+        files: '(^\.github/actions/tests/split_tests/package\.json$|^\.github/actions/tests/split_tests/package-lock\.json$|^\.github/actions/tests/split_tests/src/.*\.ts$)'
