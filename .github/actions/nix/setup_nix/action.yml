@@ -140,8 +140,8 @@ runs:
           sandbox = false
           netrc-file = /etc/nix/netrc
           extra-experimental-features = nix-command flakes
-          substituters = file:///cache/nix/binary_cache_uncompressed?trusted=1 https://cache.nixos.org/
-          trusted-substituters = file:///cache/nix/binary_cache_uncompressed?trusted=1
+          substituters = file:///cache/nix/binary_cache?trusted=1 https://cache.nixos.org/
+          trusted-substituters = file:///cache/nix/binary_cache?trusted=1
           trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
           # Parallelize NAR fetches from NFS aggressively.
           max-substitution-jobs = 32
@@ -211,7 +211,7 @@ runs:
           # Copy the entire local /nix/store to the NFS binary cache, uncompressed,
           # so readers don't pay xz-decompression cost on every job.
           T=$(date +%s)
-          nix copy --all --to 'file:///cache/nix/binary_cache_uncompressed?trusted=1&compression=none' -v
+          nix copy --all --to 'file:///cache/nix/binary_cache?trusted=1' -v
           echo "::notice title=setup_nix timing::Save: nix copy --all took $(( $(date +%s) - T ))s"
 
 
