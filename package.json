@@ -1,5 +1,5 @@
 {
-  "name": "gha-scripts",
+  "name": "@lfdecentralizedtrust/gha-scripts",
   "private": true,
   "scripts": {
     "build": "tsc && npm run build:backport_reminder && npm run build:parse_backport_comments",
