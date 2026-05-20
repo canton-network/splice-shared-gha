@@ -60,7 +60,7 @@ runs:
         echo "home: $HOME" >> /tmp/nix-cache-key # important when restoring simlinks from cache, apparently
         echo "nix binary version: $NIX_BINARY_VERSION" >> /tmp/nix-cache-key # different nix versions might behave differently and corrupt the caches
         echo "target: ${{ inputs.target }}" >> /tmp/nix-cache-key
-        echo "local-key-3" >> /tmp/nix-cache-key
+        echo "local-key-4" >> /tmp/nix-cache-key
         if [ "${{ inputs.target }}" != 'default' ]; then
           echo "Using OSS only dependencies"
         fi
@@ -98,7 +98,7 @@ runs:
         if [ -s cache.tar.gz ]; then
           sudo tar -xzf cache.tar.gz -C /cache/nix/${cache_key}
         fi
-        echo "::notice title=setup_nix timing::Download cache (non-self-hosted) took $(( $(date +%s) - STEP_START ))s"
+        echo "Download cache (non-self-hosted) took $(( $(date +%s) - STEP_START ))s"
 
     - name: Restore nix
       id: restore_nix
@@ -109,7 +109,6 @@ runs:
         sudo chown -R $(whoami):$(whoami) /nix
         if [ -f "/cache/nix/$cache_key/cached" ]; then
           echo "Restoring nix cache (key $cache_key)"
-          T=$(date +%s)
           # we use rsync here because it's simply faster to install
           rsync -avi /cache/nix/$cache_key/.nix-* $HOME/
           rsync -avi "/cache/nix/$cache_key/nix" $HOME/.config/
@@ -129,7 +128,6 @@ runs:
         echo 'source ~/.nix-profile/etc/profile.d/nix.sh' > nix.rc
         if [[ -f ~/.config/nix/nix.conf && -f ~/.nix-profile/etc/profile.d/nix.sh ]]; then
           echo "nix.conf or nix.sh already exists, skipping Nix setup"
-          echo "::notice title=setup_nix timing::Setup Nix step (skipped, already configured) took $(( $(date +%s) - STEP_START ))s"
           exit 0
         else
           # Disabling sandbox because:
@@ -155,7 +153,7 @@ runs:
         EOF
           sh <(curl -fsSL --retry 8 "https://releases.nixos.org/nix/nix-$NIX_BINARY_VERSION/install") --no-daemon
           T_INSTALL=$(date +%s)
-          echo "::notice title=setup_nix timing::Setup: nix installer took $(( T_INSTALL - STEP_START ))s"
+          echo "Setup: nix installer took $(( T_INSTALL - STEP_START ))s"
           sudo mkdir -p /etc/nix
           sudo chmod a+rw /etc/nix
           if [[ "${{ inputs.target }}" != 'default' ]]; then
@@ -175,7 +173,6 @@ runs:
           nix develop path:${{ inputs.nix_path }}#${{ inputs.target }} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
           echo "::notice title=setup_nix timing::Setup: nix develop took $(( $(date +%s) - T_PATH_START ))s"
         fi
-        echo "::notice title=setup_nix timing::Setup Nix step took $(( $(date +%s) - STEP_START ))s"
 
     - name: Invoke nix before saving cache
       if: ${{ github.repository == 'canton-network/splice' }}
@@ -205,11 +202,6 @@ runs:
           export USER=$(whoami)
           . ~/.nix-profile/etc/profile.d/nix.sh
 
-          NIX_PATH_DIR=$(cat /tmp/nix_path)
-          NIX_TARGET=$(cat /tmp/nix_target)
-
-          # Copy the entire local /nix/store to the NFS binary cache, uncompressed,
-          # so readers don't pay xz-decompression cost on every job.
           T=$(date +%s)
           nix copy --all --to 'file:///cache/nix/binary_cache?trusted=1' -v
           echo "::notice title=setup_nix timing::Save: nix copy --all took $(( $(date +%s) - T ))s"
