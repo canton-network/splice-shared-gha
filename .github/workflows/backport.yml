@@ -185,6 +185,9 @@ jobs:
           reviewer: ${{ inputs.reviewer }}
           pr_number: ${{ steps.create_pr.outputs.result }}
         with:
+          # Use the same token as the PR-creation step so the review request is
+          # made by the PR's author (canton-network-da)
+          github-token: ${{ secrets.strong_token }}
           retries: 3
           script: |
             const { reviewer } = process.env;
