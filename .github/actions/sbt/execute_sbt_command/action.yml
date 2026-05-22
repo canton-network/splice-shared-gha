@@ -43,7 +43,7 @@ inputs:
     default: "true"
   splice_root:
     description: "Path to splice repo"
-    default: ${{ github.repository == 'canton-network/splice' && '.' || 'splice' }}
+    default: ${{ github.repository == 'DACH-NY/canton-network-internal' && 'splice' || '.' }}
 
 runs:
   using: 'composite'
