@@ -42,8 +42,29 @@ if [ -n "${GITHUB_HEAD_REF:-}" ] && [ "$GITHUB_HEAD_REF" != "main" ]; then
   # On PRs from forks, GITHUB_HEAD_REF is the name of the branch in the forked repo, so we cannot actually checkout that branch directly.
   git checkout "$GITHUB_HEAD_REF" || true
 fi
+# Resolve LATEST_RELEASE from the PR head (or current commit on push
+# events) directly, not from the working tree — on fork PRs the `git
+# checkout "$GITHUB_HEAD_REF" || true` above silently fails (the fork
+# branch was never fetched into origin), leaving the working tree on
+# main. A plain `cat LATEST_RELEASE` would then return main's value
+# while downstream consumers (e.g. DarLockChecker, which reads
+# LATEST_RELEASE from the PR head's tree) see a different one.
+#
+# On PR events, also assert that the PR head's LATEST_RELEASE matches
+# main's. If main has bumped LATEST_RELEASE since the PR was opened,
+# fail loudly with an actionable message rather than fetch the wrong
+# release-line ref and abort downstream with an opaque
+# `fatal: invalid object name 'refs/remotes/origin/release-line-X'`.
+latest_release=$(git show "${current_commit}:LATEST_RELEASE")
+if [ -n "${GITHUB_HEAD_REF:-}" ] && [ "$GITHUB_HEAD_REF" != "main" ]; then
+  main_latest_release=$(git show origin/main:LATEST_RELEASE)
+  if [ "$latest_release" != "$main_latest_release" ]; then
+    echo "::error title=Stale PR — rebase needed::This PR's LATEST_RELEASE (${latest_release}) does not match main (${main_latest_release}). A new release was cut on main while this PR was open. Please rebase or merge main into your branch to pick up release-line-${main_latest_release}, then push again."
+    exit 1
+  fi
+fi
+
 echo "FETCHING LATEST RELEASE LINE"
-latest_release=$(cat LATEST_RELEASE)
 for attempt in {1..3}; do
   if git fetch origin "refs/heads/release-line-${latest_release}:refs/remotes/origin/release-line-${latest_release}" --force; then
     break
