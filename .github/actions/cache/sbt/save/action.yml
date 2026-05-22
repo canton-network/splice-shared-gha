@@ -6,7 +6,7 @@ inputs:
     required: true
   splice_root:
     description: "Path to splice repo"
-    default: ${{ github.repository == 'canton-network/splice' && '.' || 'splice' }}
+    default: ${{ github.repository == 'DACH-NY/canton-network-internal' && 'splice' || '.' }}
   load_cache_hit:
     description: "Cache hit from the restore SBT job (should be the cache_hit output from the restore SBT job)"
     required: true
