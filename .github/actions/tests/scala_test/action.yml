@@ -272,7 +272,12 @@ runs:
             export OIDC_AUTHORITY_VALIDATOR_AUDIENCE="${{ inputs.auth0_validator_audience }}"
           fi
           if [[ "${{ inputs.is_frontend_test }}" == "true" ]]; then
-            ./start-frontends.sh -d -s
+            FRONTEND_ARGS="${{ inputs.start_frontend_args }}"
+            if [[ -z "$FRONTEND_ARGS" ]]; then
+              FRONTEND_ARGS="-d -s"
+            fi
+            ./start-frontends.sh $FRONTEND_ARGS
+          
           fi
           ${{ inputs.pre_sbt_cmd }}
         post_sbt_cmd: |
