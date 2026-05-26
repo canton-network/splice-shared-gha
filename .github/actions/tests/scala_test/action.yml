@@ -43,6 +43,10 @@ inputs:
     description: "Whether this is a frontend test (implies with_frontend_creds)"
     required: false
     default: "false"
+  start_frontend_args:
+    description: "Args to pass to start-frontends.sh"
+    required: false
+    default: "-d -s"
   with_docker_images:
     description: "Whether to build docker images for the tests"
     required: false
@@ -272,7 +276,7 @@ runs:
             export OIDC_AUTHORITY_VALIDATOR_AUDIENCE="${{ inputs.auth0_validator_audience }}"
           fi
           if [[ "${{ inputs.is_frontend_test }}" == "true" ]]; then
-            ./start-frontends.sh -d -s
+            ./start-frontends.sh ${{ inputs.start_frontend_args }}
           fi
           ${{ inputs.pre_sbt_cmd }}
         post_sbt_cmd: |
