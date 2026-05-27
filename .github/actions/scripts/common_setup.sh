@@ -7,7 +7,7 @@ set -euo pipefail
 
 # shellcheck disable=SC2034
 start_time=$SECONDS
-trap 'echo "::notice title=common_setup.sh::total elapsed: $((SECONDS - start_time))s"' EXIT
+trap 'echo "total elapsed: $((SECONDS - start_time))s"' EXIT
 
 # Checkout relevant git branches and tags
 # Note that we need to checkout main and the current branch also because the todo checker uses
