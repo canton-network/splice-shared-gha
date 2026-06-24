@@ -1,6 +1,6 @@
 # Splice Shared GitHub Actions
 
-This repo contains actions that are meant to be reusable with Splice.
+This repo contained actions that were meant to be reusable with Splice.
 
 ## Assumptions
 
